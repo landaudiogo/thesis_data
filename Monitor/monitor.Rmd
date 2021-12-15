@@ -1,0 +1,84 @@
+---
+title: "monitor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cars}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(tidyquant)
+library(magrittr)
+library(rjson)
+library(gsubfn)
+library(ggpubr)
+```
+
+```{r}
+load_monitor_producer <- function(monitor_file, producer_file) {
+  monitor_log <- fromJSON(file=monitor_file)
+  producer_log <- fromJSON(file=producer_file)
+  
+  monitor <- data.frame()
+  for (item in monitor_log) {
+    monitor <- rbind(monitor, item)
+  }
+  colnames(monitor) <- c("speed", "timestamp")
+  start_monitor <- min(monitor$timestamp)
+  monitor$scope <- "monitor"
+  
+  producer <- data.frame()
+  for (item in producer_log) {
+    producer <- rbind(producer, item)
+  }
+  colnames(producer) <- c("speed", "timestamp")
+  start_producer <- min(producer$timestamp)
+  producer$scope <- "producer"
+  
+  if(start_producer < start_monitor) {
+    start_time <- start_producer
+  } else {
+    start_time <- start_monitor
+  }
+  
+  new_col <- monitor %>% 
+    summarise(time=timestamp-start_time)
+  monitor$time <- new_col$time/1000
+  
+  new_col <- producer %>%
+    summarise(time=timestamp-start_time)
+  producer$time <- new_col$time/1000
+  measurements <- rbind(monitor, producer)
+  return(measurements)
+}
+  
+```
+
+```{r}
+measurements_1 <- load_monitor_producer("monitor_t1.log", "producer_t1.log")
+```
+
+```{r}
+ggplot(measurements_1, aes(x=time, y=speed, group=scope, color=scope)) + geom_line()
+```
+
+
+```{r}
+measurements_2 <- load_monitor_producer("monitor_t2.log", "producer_t2.log")
+producer2 <- measurements_2[measurements_2$scope == "producer", ]
+monitor2 <- measurements_2[measurements_2$scope == "monitor", ]
+```
+
+
+```{r}
+ylim1 <- boxplot.stats(producer2$speed)$stats[c(1, 5)]
+
+p1 <- ggplot(measurements_2, aes(x=time, y=speed, group=scope, color=scope)) + geom_line()
+
+p2 <- ggplot(producer2, aes(y=speed, color=scope)) + 
+    geom_boxplot(aes(x=150, alpha=0.001),width=250) + 
+    geom_line(data=monitor2, aes(x=time, y=speed)) + coord_cartesian(ylim = ylim1*0.95)
+ggarrange(p1, p2, width=c(1.5,1.5))
+```

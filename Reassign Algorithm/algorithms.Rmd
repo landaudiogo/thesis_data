@@ -1,0 +1,136 @@
+---
+title: "algorithms"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load the required libraries
+
+```{r}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(tidyquant)
+library(magrittr)
+```
+
+# Create utility functions
+
+```{r}
+get_cols_idxs <- function(df, col_names) {
+  return(which(names(df) %in% col_names))
+}
+```
+
+# Load the and treat the data
+
+```{r}
+algorithms <- read.csv(file="uniform_start.csv")
+algorithms$file <- sub("^(\\w+)_(\\d+)", "\\2", algorithms$file)
+algorithms$file <- as.numeric(algorithms$file)
+```
+# Show basic statistics for each algorithm for each delta
+
+```{r}
+algorithms %>% 
+  group_by(algorithm, file) %>% 
+  summarize(
+    avg_rscore=mean(Rscore_Algorithm_Capacity), 
+    sd_rscore=sd(Rscore_Algorithm_Capacity),
+  ) %>%
+  arrange(-file, avg_rscore)
+```
+
+# Plot relevant data
+
+## Rscore min difference
+
+For each iteration, the minimum Rscore is computed, and for each algorithm, the value for that iteration is the difference of the algorithms Rscore and the minimum value. 
+
+This implies that the Rscore min difference will never be smaller than 0. 
+
+Given the table with the computed differences, the average is taken for each tested delta producing the final graph of the algorithms performance for the delta test.
+
+### Procedure
+
+First we turn each algorithm into their own column so we can then use it to compute the min difference
+```{r}
+wider_rscore <- algorithms %>%
+  summarize(file, iteration, algorithm, Rscore_Algorithm_Capacity) %>%
+  pivot_wider(names_from=algorithm, values_from=Rscore_Algorithm_Capacity)
+
+wider_rscore$min_Rscore <- apply(wider_rscore[, -get_cols_idxs(wider_rscore, c("file", "iteration"))], 1, FUN=min, na.rm=TRUE)
+wider_rscore[, -get_cols_idxs(wider_rscore, c("file", "iteration"))] %<>% 
+  mutate_at(vars(-min_Rscore), list(~ (. - min_Rscore)))
+```
+
+Having computed the difference, the algorithms are now pivoted longer, to allow for tidyr grouping operations.
+
+```{r}
+longer_rscore <- wider_rscore %>% pivot_longer(-c("file", "iteration", "min_Rscore"), names_to="algorithm", values_to="diff")
+grouped_rscore <- longer_rscore %>% group_by(file, algorithm) %>% summarize(avg_diff=mean(diff)) # %>% filter(algorithm %in% c("bfd", "mbfp", "mbf", "mwf", "mwfp"))
+
+ggplot(grouped_rscore, aes(x=file, y=avg_diff, color=algorithm)) + 
+  geom_point() + 
+  geom_line(data=grouped_rscore, aes(group=algorithm)) + 
+  labs(title="RSCORE diff")
+```
+
+
+## Difference to minimum number of consumers
+
+### Procedure
+
+```{r}
+wider_nconsumers <- algorithms %>% 
+  summarize(file, iteration, algorithm, Number.of.Consumers) %>%
+  pivot_wider(names_from=algorithm, values_from=Number.of.Consumers)
+
+wider_nconsumers$min_consumers <- apply(wider_nconsumers[,-get_cols_idxs(wider_nconsumers, c("file", "iteration"))], 1, FUN=min, na.rm=TRUE)
+wider_nconsumers[, -get_cols_idxs(wider_nconsumers, c("file", "iteration"))] %<>% 
+  mutate_at(vars(-min_consumers), list(~ (. - min_consumers)/min_consumers))
+```
+
+```{r}
+longer_nconsumers <- wider_nconsumers %>% pivot_longer(!c("file", "iteration", "min_consumers"), names_to="algorithm", values_to="diff") 
+group_nconsumers <- longer_nconsumers %>% group_by(file, algorithm) %>% summarize(avg_diff_to_min=mean(diff)) 
+
+ggplot(group_nconsumers, aes(x=file, y=avg_diff_to_min, color=algorithm)) + 
+  geom_point() + 
+  geom_line(data=group_nconsumers, aes(group=algorithm)) +
+  labs(
+    y="Average Relative Deviation from minimum number of consumers", 
+    x="Delta"
+  )
+```
+
+```{r}
+filtered_nconsumers <- group_nconsumers %>% 
+  filter(algorithm %in% c("mwf", "mbf", "mbfp", "mwfp", "bfd")) #, "mbfp", "mbf", "mwf", "mwfp"))
+
+ggplot(filtered_nconsumers, aes(x=file, y=avg_diff_to_min, color=algorithm)) + 
+  geom_point() + 
+  geom_line(data=filtered_nconsumers, aes(group=algorithm)) +
+  labs(
+    y="Average Relative Deviation from minimum number of consumers", 
+    x="Delta"
+  )
+
+```
+
+## Average Rscore
+
+```{r}
+rscore_avg <- algorithms %>% 
+  group_by(file, algorithm) %>% 
+  summarize(avg_rscore=mean(Rscore_Algorithm_Capacity))
+
+ggplot(rscore_avg, aes(x=file, y=avg_rscore, color=algorithm)) + 
+  geom_point() + geom_line(data=rscore_avg, aes(group=algorithm)) + 
+  labs(
+    y="Average Rscore", 
+    x="Delta"
+  )
+```
+
