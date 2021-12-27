@@ -1,2 +1,5 @@
 images/
+generated_plots/
 ./Literature Review
+*.Rhistory
+*.Rproj*

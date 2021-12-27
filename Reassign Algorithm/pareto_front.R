@@ -1,4 +1,4 @@
-setwd("Thesis/Reassign Algorithm")
+setwd("C:/Users/DLA149/Documents/Thesis/Reassign Algorithm")
 here::i_am("pareto_front.R")
 
 library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
@@ -6,6 +6,9 @@ library(tidyquant)
 library(magrittr)
 library(here)
 library(ggrepel)
+library(emoa)
+
+dir.create(here("pareto_front"))
 
 get_cols_idxs <- function(df, col_names) {
   return(which(names(df) %in% col_names))
@@ -88,13 +91,32 @@ for(delta_v in c(5,10,15,20,25)) {
 }
 
 pareto_deltas %>%
-  ggplot(aes(x=avg_diff_to_min, y=avg_rscore, color=dominated)) + 
+  ggplot(aes(x=avg_diff_to_min, y=avg_rscore, shape=dominated)) +
   geom_point() + 
-  geom_step(data={. %>% filter(dominated==FALSE)}) +
+  geom_step(data={. %>% filter(dominated==FALSE)}, alpha=0.2) +
   geom_text_repel(aes(label=algorithm), color="black") + 
   facet_wrap(~delta) + 
   labs(
     title="Pareto Front for each Delta", 
     x="Relative Number of consumers above minimum",
     y="Rscore"
-  )
+  ) + 
+  theme_bw()
+ggsave(filename=here("pareto_front/facet_wrapped.png"))
+
+deltas <- pareto_deltas %>% as.data.frame() %>% distinct(delta)
+for(d in deltas$delta) {
+  temp_plot <- pareto_deltas %>% filter(delta==d) %>% 
+    ggplot(aes(x=avg_diff_to_min, y=avg_rscore, shape=dominated)) +
+    geom_point() + 
+    geom_step(data={. %>% filter(dominated==FALSE)}, alpha=0.2) +
+    geom_text_repel(aes(label=algorithm), color="black") + 
+    labs(
+      x="Relative Number of consumers above minimum",
+      y="Rscore"
+    ) + 
+    theme_bw()
+  ggsave(temp_plot, filename=here(sprintf("pareto_front/%d.png", d)))
+}
+
+

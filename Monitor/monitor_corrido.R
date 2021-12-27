@@ -1,22 +1,16 @@
----
-title: "monitor"
-output: html_document
----
+setwd("C:/Users/DLA149/Documents/Thesis/Monitor")
+here::i_am("monitor_corrido.R")
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r cars}
 library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
 library(tidyquant)
 library(magrittr)
 library(rjson)
 library(gsubfn)
 library(ggpubr)
-```
+library(here)
 
-```{r}
+dir.create(here("generated_plots"), showWarnings=FALSE)
+
 load_monitor_producer <- function(monitor_file, producer_file) {
   monitor_log <- fromJSON(file=monitor_file)
   producer_log <- fromJSON(file=producer_file)
@@ -53,26 +47,22 @@ load_monitor_producer <- function(monitor_file, producer_file) {
   measurements <- rbind(monitor, producer)
   return(measurements)
 }
-  
-```
 
-```{r}
-measurements_1 <- load_monitor_producer("monitor_t1.log", "producer_t1.log")
-```
+measurements_1 <- load_monitor_producer(here("monitor_t1.log"), here("producer_t1.log"))
 
-```{r}
-ggplot(measurements_1, aes(x=time, y=speed, group=scope, linetype=scope)) + geom_line() + theme_bw()
-```
+ggplot(measurements_1, aes(x=time, y=speed, group=scope, linetype=scope)) + 
+  geom_line() + 
+  labs(
+    x="Time (s)", 
+    y="Measured Throughput (bits/s)"
+  ) +
+  theme_bw()
+ggsave(filename=here("generated_plots/step.png"))
 
-
-```{r}
-measurements_2 <- load_monitor_producer("monitor_t2.log", "producer_t2.log")
+measurements_2 <- load_monitor_producer(here("monitor_t2.log"), here("producer_t2.log"))
 producer2 <- measurements_2[measurements_2$scope == "producer", ]
 monitor2 <- measurements_2[measurements_2$scope == "monitor", ]
-```
 
-
-```{r}
 ylim1 <- boxplot.stats(producer2$speed)$stats[c(1, 5)]
 
 p1 <- ggplot(measurements_2, aes(x=time, y=speed, group=scope, linetype=scope)) + 
@@ -91,5 +81,8 @@ p2 <- ggplot(producer2, aes(y=speed, line_type=scope)) +
     y="Measured Throughput (bits/s)"
   ) + 
   theme_bw()
+ggsave(p1, filename=here("generated_plots/random_without_boxplot.png"))
+ggsave(p2, filename=here("generated_plots/random_with_boxplot.png"))
+
 ggarrange(p1, p2, width=c(1.5,1.5))
-```
+ggsave(filename=here("generated_plots/random_arrange.png"))
