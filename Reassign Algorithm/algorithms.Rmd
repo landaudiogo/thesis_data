@@ -33,13 +33,42 @@ algorithms$file <- as.numeric(algorithms$file)
 # Show basic statistics for each algorithm for each delta
 
 ```{r}
-algorithms %>% 
+t <- algorithms %>% 
   group_by(algorithm, file) %>% 
   summarize(
     avg_rscore=mean(Rscore_Algorithm_Capacity), 
     sd_rscore=sd(Rscore_Algorithm_Capacity),
   ) %>%
-  arrange(-file, avg_rscore)
+  arrange(-file, avg_rscore) %>% 
+  ungroup() %>% 
+  mutate(
+    algo_type = case_when(
+      algorithm %in% c('mbfp', 'mbf', 'mwfp', 'mwf') ~ "M",
+      TRUE ~ "E"
+    )
+  )
+```
+
+
+```{r}
+existing_min_per_delta <- t %>%
+  filter(algo_type == "E") %>%
+  group_by(file) %>%
+  summarize(existing_min = min(avg_rscore)) %>% ungroup()
+t %>% 
+  left_join(existing_min_per_delta, by=c('file')) %>%
+  arrange(-file, avg_rscore) %>%
+  group_by(file) %>% 
+  mutate(
+    rn=row_number(),
+    relative_rscore = avg_rscore/existing_min,
+    relative_diff=1-avg_rscore/existing_min
+  ) %>% filter(rn==1)
+  
+```
+
+```{r}
+t
 ```
 
 # Plot relevant data
@@ -95,6 +124,8 @@ wider_nconsumers[, -get_cols_idxs(wider_nconsumers, c("file", "iteration"))] %<>
 ```{r}
 longer_nconsumers <- wider_nconsumers %>% pivot_longer(!c("file", "iteration", "min_consumers"), names_to="algorithm", values_to="diff") 
 group_nconsumers <- longer_nconsumers %>% group_by(file, algorithm) %>% summarize(avg_diff_to_min=mean(diff)) 
+
+group_nconsumers %>% filter(algorithm == "mwf")
 
 ggplot(group_nconsumers, aes(x=file, y=avg_diff_to_min, color=algorithm)) + 
   geom_point() + 
