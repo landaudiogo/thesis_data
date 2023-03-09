@@ -1,5 +1,4 @@
-setwd("C:/Users/DLA149/Documents/Thesis/Reassign Algorithm")
-here::i_am("pareto_front.R")
+here::i_am("Reassign Algorithm/pareto_front.R")
 
 library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
 library(tidyquant)
@@ -8,7 +7,7 @@ library(here)
 library(ggrepel)
 library(emoa)
 
-dir.create(here("pareto_front"))
+dir.create(here("Reassign Algorithm", "pareto_front"), showWarnings=FALSE)
 
 get_cols_idxs <- function(df, col_names) {
   return(which(names(df) %in% col_names))
@@ -29,7 +28,7 @@ files = c(
   "uniform_start.csv"
 )
 for(file_name in files) {
-  algorithms <- read.csv(file=here(file_name))
+  algorithms <- read.csv(file=here("Reassign Algorithm", file_name))
   algorithms$file <- sub("^(\\w+)_(\\d+)", "\\2", algorithms$file)
   algorithms$file <- as.numeric(algorithms$file)
   names(algorithms)[names(algorithms) == "file"] <- "delta"
@@ -80,10 +79,10 @@ for(delta_v in c(5,10,15,20,25)) {
   ggplot(ps, aes(x=avg_diff_to_min, y=avg_rscore, color=dominated)) + 
     labs(
       title=sprintf("Pareto Front for a delta value of %d", delta_v),
-      x="Relative Number of Consumers above minimum", 
+      x="CBS", 
       y="Rscore"
     ) +
-    geom_point() + 
+    geom_point(size=2) + 
     geom_step(data=ps[ps$dominated == FALSE,], direction="hv") +
     geom_text_repel(aes(label=algorithm), color="black")
   
@@ -106,17 +105,16 @@ ggsave(filename=here("pareto_front/facet_wrapped.png"))
 
 deltas <- pareto_deltas %>% as.data.frame() %>% distinct(delta)
 for(d in deltas$delta) {
-  temp_plot <- pareto_deltas %>% filter(delta==d) %>% 
+  pareto_deltas %>% filter(delta==d) %>% 
     ggplot(aes(x=avg_diff_to_min, y=avg_rscore, shape=dominated)) +
-    geom_point() + 
-    geom_step(data={. %>% filter(dominated==FALSE)}, alpha=0.2) +
-    geom_text_repel(aes(label=algorithm), color="black") + 
+    geom_point(size=2) + 
+    geom_step(data={. %>% filter(dominated==FALSE)}, alpha=1) +
+    geom_text_repel(aes(label=algorithm), color="black", size=6) + 
     labs(
-      x="Relative Number of consumers above minimum",
-      y="Rscore"
+      x="CBS",
+      y="Average Rscore"
     ) + 
-    theme_bw()
-  ggsave(temp_plot, filename=here(sprintf("pareto_front/%d.png", d)))
+    theme_bw() +
+    theme(text = element_text(size = 18))
+  ggsave(filename=here("Reassign Algorithm", sprintf("pareto_front/%d.pdf", d)))
 }
-
-
